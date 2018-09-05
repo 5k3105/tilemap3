@@ -1,5 +1,5 @@
 package main
-
+/// ref: github.com/mandykoh/scrubble
 type Board struct {
 	OffsetX, OffsetY int
 	Rows             int
