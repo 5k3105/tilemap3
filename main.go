@@ -13,16 +13,18 @@ import (
 )
 
 var (
-	tileset       map[string]image.Image
-	offset        int
-	scale         float64
-	board         Board
-	board_offset  = 2
-	rows, columns = 20, 10
+	tileset             map[string]image.Image
+	tilefiles           []string
+	offset              int
+	scale               float64
+	board               Board
+	selector            Board
+	selected_tile       string
+	cscale, cmultiplier float64
 )
 
 func init() {
-	tilefiles := []string{"forest", "grass", "marsh", "village"}
+	tilefiles = []string{"forest", "grass", "marsh", "village", "rocket", "water"}
 	tileset = make(map[string]image.Image)
 
 	for _, tf := range tilefiles {
@@ -38,10 +40,15 @@ func init() {
 		tileset[tf] = img
 	}
 
-	img := tileset["village"]
+	selected_tile = "grass"
+	img := tileset[selected_tile]
 
 	offset = img.Bounds().Dx() / 2
 	scale = float64(img.Bounds().Dx())
+
+	cscale = 1.0
+	cmultiplier = 0.8
+
 }
 
 func main() {
@@ -52,16 +59,31 @@ func main() {
 	}
 	defer wnd.Destroy()
 
-	var mx, my, action float64
+	cv.SetFont("Righteous-Regular.ttf", 12)
 
-	board := Board{
-		OffsetX:   board_offset,
-		OffsetY:   board_offset,
+	ofx, ofy := 2, 2
+	rows, columns := 20, 10
+	board = Board{
+		OffsetX:   ofx,
+		OffsetY:   ofy,
 		Rows:      rows,
 		Columns:   columns,
 		Positions: make([]Position, rows*columns),
 	}
 
+	ofx, ofy = columns+ofx*2, 2
+	rows, columns = len(tilefiles), 1
+	selector = Board{
+		OffsetX:   ofx,
+		OffsetY:   ofy,
+		Rows:      rows,
+		Columns:   columns,
+		Positions: make([]Position, rows*columns),
+	}
+
+	selector.AddSelectors()
+
+	var mx, my, action float64
 	wnd.MouseMove = func(x, y int) {
 		mx, my = float64(x), float64(y)
 	}
@@ -70,10 +92,24 @@ func main() {
 		if button == 1 { /// mouse left == 1, mouse right == 3
 			action = 1
 			board.AddTile(x, y)
+			selector.SelectTile(x, y)
 		}
 		if button == 3 {
 			action = 1
+			board.DeleteTile(x, y)
 		}
+	}
+
+	wnd.MouseWheel = func(x, y int) {
+		action = 1
+		if y == 1 {
+			cscale /= cmultiplier
+		}
+		if y == -1 {
+			cscale *= cmultiplier
+		}
+		cv.Scale(cscale, cscale)
+		println("y:  ", y)
 	}
 
 	wnd.KeyDown = func(scancode int, rn rune, name string) {
@@ -118,7 +154,6 @@ func main() {
 		open_tl, open_br := action*12, action*24
 		cv.Rect(tx-open_tl, ty-open_tl, scale+open_br, scale+open_br)
 		cv.Stroke()
-		cv.FillText(fmt.Sprintf("x:", tx, "y:", ty), tx, ty-2)
 
 		// Draw tiles where the user has clicked
 		for _, p := range board.Positions {
@@ -127,6 +162,17 @@ func main() {
 				cv.PutImageData(tileset[t.Type].(*image.RGBA), t.X, t.Y)
 			}
 		}
+
+		for _, p := range selector.Positions {
+			t := p.PTile
+			if t != nil {
+				cv.PutImageData(tileset[t.Type].(*image.RGBA), t.X, t.Y)
+			}
+		}
+
+		cv.SetFillStyle("#778899")
+		cv.FillText(fmt.Sprintf("x:%d  y:%d", int(tx), int(ty)), tx, ty-2.0)
+
 	})
 }
 
